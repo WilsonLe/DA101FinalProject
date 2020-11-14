@@ -1,0 +1,272 @@
+---
+title: "DA101 - Final project assignment"
+author: "Wilson Le"
+date: "10/21/2020"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+THE EFFECTS OF CLIMATE ON THE SPREAD OF COVID-19
+===
+
+## Topic Exploration
+
+Corona virus disease 2019 (COVID-19), initially identified in December 2019 in Wuhan, China, has now become a global pandemic. It is a very infectious virus that spreads between humans, mainly via physical contact with bodily fluids[1]. Scientific research has shown that climate temperature plays a role in the spreading of the virus[2]. This research aim to redo the experiment using different data and techniques to see if the claims made in the researches are true. The problem with this topic is that every country has a different population and different seriousness when it comes to dealing with the pandemic, which consequently affect the number of confirmed cases for every different country.
+
+This research will answer the question: Does climate temperature affect the spread of Covid-19? And How? To measure the “spread of Covid-19”, the research will be looking at the daily confirmed cases of a country. This data will be collected from the Covid-19 data by Our world in Data[4]. The independent variable that might affect the spread of Covid-19 will be the mean temperature of different regions in a country. Temperature data set of major cities in the United States will be used to gather information about daily temperature of different cities/regions of the United States[5]. Since every country has a different level of seriousness when it comes to dealing with this pandemic, focusing only one country (i.e the United States) will minimize the effect of this variable. This topic question will be an exploratory type of question, as it will be looking for unknown patterns within the data.
+
+## Project plan
+
+My research question requires the following variables: a dependent variable corresponding to the spread of COVID-19, which is the number of confirmed positive case per state, the independent variables corresponding to the effect of climate temperature is the temperature of a state in the United States.
+
+The dependent variable will be taken from the COVID tracking project’s data set. The project is a non-profit organization tasked to collect and publish data required to quantify the spread and seriousness of COVID-19 in the United States. The data is now being collected by volunteers and processed and analyzed by developers, scientists, designers, editors, reporters, and many enthusiast contributors[5]. Despite being collected by volunteers, there are strict quality scoring methods in place for all these collected data. This project has been collecting data since January of 2020. With the vast amount of data and its precision, this data set samples the real situation of any collected regions. There are many variables in this data set, but this research only pays attention to a few of them. The “date” and “state” are 2 necessary variables to tell when and where the data is collected, along with the number that we are looking for, the “positiveCasesViral” and “totalTestsPeopleViral”. According to the metadata provided by the data owners, the variable “positiveCasesViral” corresponds to “the total number of unique people with a complete PCR test that returns positive”, or in other words, the total of confirmed cases, and the variable “totalTestsPeopleViral” corresponds to the total number of “unique people tested at least once via PCR testings”[6]. These 4 variables from this data set will provide data of confirmed cases in each state over a time period, which consequently corresponds to the spread of the pandemic in state areas of the whole country. 
+
+Moving on to the two independent variables, the data set collected by Eeemonts on Kaggle will provide precise data. This data set is actually compiled by calling API requests from Dark Sky, a company that’s recently acquired by Apple but the API data collection is still available. This company measures weather information and updates it by the minute[7]. Eeemonts has been pulling and compiling data since January 2020, resulting in a massive cluster of data sets that includes a multitude of variables[5]. The sample that this cluster of data sets is a detailed data weather information of every city of state every day since January. However, we are only paying attention to two data sets, the “tMax_US.csv” and “tMin_US.csv”. These data sets include two important variables that the research needs: the maximum temperature and the minimum temperature of a city in a state in a day, which, will provide the range of temperature of a state.
+
+My analysis method will be focusing on temperature of a day and the number of confirmed positive test case. For temperature variable, the maximum and minimum temperature, which is already provided in the data set will be used. The data set has variables representing a single day, for as many days as there are as many variables. In order to use this data in my analysis, I would have to do some data processing: mutating day, month, year variables to represent time, and mutating maximum and minimum variables to represent the two highest and lowest temperatures of a state in a day. After the processing step, I would end up with a data set containing variables that represent time (day, month, year), variables that represent place (state), and variables that represent temperature range (maximum and minimum). In the COVID-19 data set, I would filter out only the variables that I will need (i.e total number of tests, total number of confirmed cases, state and time) and merge the two data sets into one unified data set. This will make it much more convenient for me to conduct tests to answer my research questions: does temperature affect the spread of COVID-19, and how?
+
+To answer the question, I will compare between states, the change of numbers of confirmed test cases over the state's temperature range over time. In doing so will give us insight about how different temperature ranges effect the number of confirmed cases of a state
+
+## Data processing
+
+Import libraries
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(knitr)
+```
+
+<br/><br/>
+
+Import data:
+```{r}
+Covid19Data <- read.csv('Covid-19-All-State-History.csv')
+maxTempData <- read.csv('./csv/tMax_US.csv')
+minTempData <- read.csv('./csv/tMin_US.csv')
+```
+
+<br/><br/>
+
+Process Covid19 data:
+
+
+```{r}
+Covid19Data <- Covid19Data %>%
+  
+  # Select the wanted variables:
+  select(date, state, positiveCasesViral, totalTestsPeopleViral) %>%
+  
+  # Remove incomplete observations:
+  na.omit() %>%
+  
+  # Filter out data within January and August
+  filter(as.numeric(substr(date, start = 6, stop = 7)) <= 8) %>% 
+  filter(as.numeric(substr(date, start = 6, stop = 7)) >= 5) %>%
+
+  # Mutate a month variable
+  mutate(month = substr(date, start = 1, stop = 7))
+  
+# Aggregate monthly sum positive case:
+monthlySumPositiveCase <- aggregate(Covid19Data$positiveCasesViral, by=list(state=Covid19Data$state, month = Covid19Data$month), FUN=sum) %>% rename(positiveCaseViral = x)
+
+# Aggregate monthly sum tests:
+monthlySumTests <- aggregate(Covid19Data$totalTestsPeopleViral, by=list(state=Covid19Data$state, month = Covid19Data$month), FUN=sum) %>% rename(totalTestsPeopleViral = x)
+
+# Merge the two together:
+Covid19MonthlyData <- merge(monthlySumPositiveCase, monthlySumTests, by=c("state", "month"))
+
+# Display a small portion of the data
+kable(head(Covid19MonthlyData, n=20))
+```
+
+<br/><br/>
+
+Process max temperature data:
+```{r}
+# Calculate the mean maximum temperature of a state in a day
+maxTempbyProv <- aggregate(maxTempData[12:269] , by=list(province=maxTempData$Province_State), FUN=mean)
+
+# Calculate the mean maximum temperature of a state in a month
+maxTempbyProv <- maxTempbyProv %>%
+  mutate("2020-1" = rowMeans(.[2:32])) %>%
+  mutate("2020-2" = rowMeans(.[33:61])) %>%
+  mutate("2020-3" = rowMeans(.[62:92])) %>%
+  mutate("2020-4" = rowMeans(.[93:121])) %>%
+  mutate("2020-5" = rowMeans(.[122:152])) %>%
+  mutate("2020-6" = rowMeans(.[153:182])) %>%
+  mutate("2020-7" = rowMeans(.[183:213])) %>%
+  mutate("2020-8" = rowMeans(.[214:244]))
+
+# Select just the state and the mean maximum temperature of states in a month.
+maxTempbyProv <- maxTempbyProv %>% select(province, starts_with("2020"))
+
+# Define function to transpose a state's temperature per month data.
+transposeMaxState <- function(stateName){
+  df <- maxTempbyProv %>% filter(province == as.character(stateName)) %>%
+    select(starts_with("2020")) %>%
+    t() %>%
+    as.data.frame()
+  df <- df %>% mutate(month = rownames(df)) %>% mutate(province = stateName) %>% rename(Max = V1)
+  return(df)
+}
+
+# Define function to bind all the transposed data.
+bindStates <- function(){
+  bindDf <- data.frame()
+  for (state in maxTempbyProv$province){
+    tempDf <- transposeMaxState(state)
+    bindDf <- rbind(bindDf, tempDf)
+  }
+  return(bindDf)
+}
+
+# Transposed maximum temperature data
+maxTempbyProvTransposed <- bindStates()
+
+#Display the first 10 value of the new data set.
+kable(head(maxTempbyProvTransposed, n=20))
+```
+
+<br/><br/>
+
+Process min temperature data:
+```{r}
+#Calculate the mean minimum temperature of a state in a day
+minTempbyProv <- aggregate(minTempData[12:269] , by=list(province=minTempData$Province_State), FUN=mean)
+
+#Calculate the mean minimum temperature of a state in a month
+minTempbyProv <- minTempbyProv %>%
+  mutate("2020-1" = rowMeans(.[2:32])) %>%
+  mutate("2020-2" = rowMeans(.[33:61])) %>%
+  mutate("2020-3" = rowMeans(.[62:92])) %>%
+  mutate("2020-4" = rowMeans(.[93:121])) %>%
+  mutate("2020-5" = rowMeans(.[122:152])) %>%
+  mutate("2020-6" = rowMeans(.[153:182])) %>%
+  mutate("2020-7" = rowMeans(.[183:213])) %>%
+  mutate("2020-8" = rowMeans(.[214:244]))
+
+# Select just the state and the mean maximum temperature of states in a month.
+minTempbyProv <- minTempbyProv %>% select(province, starts_with("2020"))
+
+# Define function to transpose a state's temperature per month data.
+transposeMinState <- function(stateName){
+  df <- minTempbyProv %>% filter(province == as.character(stateName)) %>%
+    select(starts_with("2020")) %>%
+    t() %>%
+    as.data.frame()
+  df <- df %>% mutate(month = rownames(df)) %>% mutate(province = stateName) %>% rename(Min = V1)
+  return(df)
+}
+
+# Define function to bind all the transposed data.
+bindStates <- function(){
+  bindDf <- data.frame()
+  for (state in minTempbyProv$province){
+    tempDf <- transposeMinState(state)
+    bindDf <- rbind(bindDf, tempDf)
+  }
+  return(bindDf)
+}
+
+# Transposed maximum temperature data
+minTempbyProvTransposed <- bindStates()
+
+#Display the first 10 value of the new data set.
+kable(head(minTempbyProvTransposed, n=20))
+```
+
+<br/><br/>
+
+Merge temperature data:
+
+```{r warning=FALSE, message=FALSE}
+# Merge the max and min temperature into one data set.
+TempByProv <- merge(maxTempbyProvTransposed, minTempbyProvTransposed, by=c("province", "month"))
+
+# Display the first 10 values of the merged temperature data set.
+options(digits = 3)
+kable(head(TempByProv, n = 10))
+```
+
+
+## Visualization
+
+Line plot showing the change in Covid19 __positive test cases__ in the entire US in 2020.
+
+```{r}
+ggplot(monthlySumPositiveCase, aes(month, positiveCaseViral, group = 1)) + 
+  geom_line() +
+  geom_point() + 
+  labs(
+    title="Covid19 positive test cases",
+    caption='The change in Covid19 positive test cases in the entire US in 2020',
+    x="Month",
+    y="Positive test cases") + 
+  theme_minimal() + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Line plot showing the change in Covid19 __tests__ in the entire US in 2020.
+
+```{r}
+ggplot(monthlySumTests, aes(month, x, group = 1)) + 
+  geom_col(fill='steelblue') + 
+  labs(
+    title="Covid19 tests",
+    caption='The change in Covid19 number of tests in the entire US in 2020',
+    x="Month",
+    y="Number of tests") + 
+  theme_minimal() + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+Line plot showing the change in Covid19 __positive case per test__ in the entire US in 2020.
+
+```{r}
+names(monthlySumTests)[[2]] = "totalTestPeopleViral"
+names(monthlySumPositiveCase)[[2]] = "positiveCasesViral"
+
+monthlyPositivePerTest <- merge(monthlySumTests, monthlySumPositiveCase) %>%
+  mutate(positivePerTest = positiveCasesViral / totalTestPeopleViral)
+
+ggplot(monthlyPositivePerTest, aes(month,positivePerTest, group = 1)) + 
+  geom_line() +
+  geom_point() + 
+  labs(
+    title="Covid19 case per test",
+    caption='The change in Covid19 confirmed case per test in the entire US in 2020',
+    x="Month",
+    y="Case per test") + 
+  theme_minimal() + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Written Analysis
+A knitted and polished rMarkdown file and HTML output reporting the results of your final data analysis project. Roughly, 3-5 written pages maximum. Consider it a "final takeaway" of all the skills you’ve learned in class over the semester. Below is a rough structure of your final written report. Here you should use code folding so this section mirrors a ready to deliver report with clear section headers and interpretations of any statistical or graphical output (like several of our previous projects), but it will also be easy for your instructor to see the code, if needed. Include the following sections in your report:
+
+Introduction:
+
+Provide a two paragraph introduction, professionally written, that gives an overview of the essentials someone needs to know to make sense of the data you show. You must cite and link to your data set somewhere in the introduction (a footnote is OK). Revising and building on your introduction from the previous assignments is allowed and encouraged, but using the exact same introduction is discouraged.
+
+Ethical Considerations:
+
+Provide one paragraph discussing the stakeholders in your data analysis and your ethical concerns or responsibilities using the data and in your analysis. Everyone has ethical considerations, no matter what the data set or subject matter.
+
+Data Explanation and Exploration:
+
+Provide some details describing the data you are working with. What are the observations? The key variables you will be looking at? Are there any particular challenges in the data you will need to work through or be aware of during analysis?
+
+Provide two polished visuals that describes the data in a way relevant to your question (descriptive, not related to your statistical model specifically--not a scatter plot). Write text that describes the data and what the visuals tell you about your data or decisions you will need to make for the analysis.
+
+Statistical Analysis and Interpretation:
+
+Provide at least two distinct statistical models (for example; multivariate regression and/or t-test) that you interpret correctly and fully in the text. Report your results in a polished table (kable).
+
+Provide at least three polished visuals that specifically support and validate the model(s) you have developed (e.g., residual and regression line/scatter, histogram showing normality of data or residuals, etc.), or help to communicate your main result. Visuals should have captions and be referred to clearly in your text, and they should not all be the same (e.g., not three scatter plots). Text should fully explain what you show and your findings, to someone who is unfamiliar with your data, code, and models, in terms of the data and in plain language.
+
+Conclusions:
+
+Provide one or two paragraphs concluding about the data: what does it tell us, what are the limitations to this data/model, and what is one future direction you could envision for future data analysts or data collectors?
+
+Find at least one reference that is relevant to or supports your insights, and cite it in this section. You may cite a reference by linking directly to it in your Rmd and/or citing it using your style of choice. Either way, the full citation should also appear in a "Works Cited" page below the conclusions section.
