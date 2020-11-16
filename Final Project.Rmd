@@ -10,6 +10,16 @@ output:
 THE EFFECTS OF CLIMATE ON THE SPREAD OF COVID-19
 ===
 
+## Introduction:
+
+Corona virus disease 2019 (COVID-19), initially identified in December 2019 in Wuhan, China, has now become a global pandemic. It is a very infectious virus that spreads between humans, mainly via physical contact with bodily fluids[1]. Scientific research has shown that climate temperature plays a role in the spreading of the virus[2]. This research aim to redo the experiment using different data and techniques to see if the claims made in the researches are true.
+
+Research will try to answer the question: Does climate temperature affects the spread of Covid-19? And how? The dependent variable, which will be the variable used to determine the "spread of Covid-19", will be the daily confirmed cases of a country. By looking at a single country, the data will be more uniform as different country has different population size and different seriousness when it comes to response to the pandemic, which consequently affect the number of confirmed cases. This variable will be extracted from the Covid-19 data by Out world in Data[4]. The independent variable that might effect the spread of Covid-19 that the research is going to look at is minimum and maximum temperature of different regions in a country (i.e different states in the US). Temperature data set of the US states since January to October[5] will be used to extract the necessary data to perform analysis. The topic question will be an exploratory type of question, as it will be looking for unknown patterns within the data.
+
+## Ethical Considerations:
+
+Since the researching the research is using data from the internet for analysis, the data itself are public for every one to look at and process. However, the research is conducted by an individual (me), however carefully conducted, there will be flaws and mistakes in logic and assumptions. There are potential for harm in this analysis. As Covid19 is a very unpredictable infectious disease, these analysis should only be part of the consideration of your decision to act upon the disease.
+
 ## Data processing
 
 Import libraries
@@ -17,6 +27,7 @@ Import libraries
 library(tidyverse)
 library(knitr)
 library(GGally)
+library(stringi)
 ```
 
 <br/><br/>
@@ -42,58 +53,43 @@ Covid19Data <- Covid19Data %>%
   select(date, state, positiveCasesViral, totalTestsPeopleViral) %>%
   
   # Remove incomplete observations:
-  na.omit() %>%
-  
-  # Filter out data within January and August
-  filter(as.numeric(substr(date, start = 6, stop = 7)) <= 8) %>% 
-  
-  # Mutate a month variable
-  mutate(month = substr(date, start = 1, stop = 7))
+  na.omit()
   
 # Aggregate monthly sum positive case of each state:
-monthlySumPositiveCase <- aggregate(Covid19Data$positiveCasesViral, by=list(state=Covid19Data$state, month = Covid19Data$month), FUN=sum) %>% rename(positiveCaseViral = x)
+SumPositiveCase <- aggregate(Covid19Data$positiveCasesViral, by=list(state=Covid19Data$state, date = Covid19Data$date), FUN=sum) %>% rename(positiveCaseViral = x)
 
 # Aggregate monthly sum tests of each state:
-monthlySumTests <- aggregate(Covid19Data$totalTestsPeopleViral, by=list(state=Covid19Data$state, month = Covid19Data$month), FUN=sum) %>% rename(totalTestsPeopleViral = x)
+SumTests <- aggregate(Covid19Data$totalTestsPeopleViral, by=list(state=Covid19Data$state, date = Covid19Data$date), FUN=sum) %>% rename(totalTestsPeopleViral = x)
 
 # Merge the two together:
-Covid19MonthlyData <- merge(monthlySumPositiveCase, monthlySumTests, by=c("state", "month"))
+Covid19SumData <- merge(SumPositiveCase, SumTests, by=c("state", "date"))
 
 
-#Aggregate monthly conducted test of entire US:
-Covid19SumTest <- aggregate(Covid19Data$totalTestsPeopleViral, by=list(month = Covid19Data$month), FUN=sum) %>% rename(totalTestPeopleViral = x)
-
-kable(head(Covid19MonthlyData, n=20))
+kable(head(Covid19SumData, n=20))
 ```
 
 <br/><br/>
 
 Process max temperature data:
 ```{r}
-# Calculate the mean maximum temperature of a state in a day
+# Calculate the mean maximum daily temperature.
 maxTempbyProv <- aggregate(maxTempData[12:269] , by=list(province=maxTempData$Province_State), FUN=mean)
 
-# Calculate the mean maximum temperature of a state in a month
-maxTempbyProv <- maxTempbyProv %>%
-  mutate("2020-01" = rowMeans(.[2:32])) %>%
-  mutate("2020-02" = rowMeans(.[33:61])) %>%
-  mutate("2020-03" = rowMeans(.[62:92])) %>%
-  mutate("2020-04" = rowMeans(.[93:121])) %>%
-  mutate("2020-05" = rowMeans(.[122:152])) %>%
-  mutate("2020-06" = rowMeans(.[153:182])) %>%
-  mutate("2020-07" = rowMeans(.[183:213])) %>%
-  mutate("2020-08" = rowMeans(.[214:244]))
 
-# Select just the state and the mean maximum temperature of states in a month.
-maxTempbyProv <- maxTempbyProv %>% select(province, starts_with("2020"))
+# Select just the state and the mean maximum daily temperature of states.
+maxTempbyProv <- maxTempbyProv %>% select(province, starts_with("X"))
 
-# Define function to transpose a state's temperature per month data.
+# Define function to transpose a state's daily temperature data.
 transposeMaxState <- function(stateName){
   df <- maxTempbyProv %>% filter(province == as.character(stateName)) %>%
-    select(starts_with("2020")) %>%
+    select(starts_with("X")) %>%
     t() %>%
     as.data.frame()
-  df <- df %>% mutate(month = rownames(df)) %>% mutate(province = stateName) %>% rename(Max = V1)
+  df <- df %>% 
+    mutate(unformatedDate = substr(rownames(df), start=2, stop=8)) %>% 
+    mutate(province = stateName) %>% rename(Max = V1) %>% 
+    mutate(date = as.Date.character(unformatedDate, format="%m.%d.%y")) %>%
+    select(!unformatedDate)
   return(df)
 }
 
@@ -118,30 +114,23 @@ kable(head(maxTempbyProvTransposed, n=20))
 
 Process min temperature data:
 ```{r}
-#Calculate the mean minimum temperature of a state in a day
+#Calculate the mean minimum daily temperature of a state.
 minTempbyProv <- aggregate(minTempData[12:269] , by=list(province=minTempData$Province_State), FUN=mean)
 
-#Calculate the mean minimum temperature of a state in a month
-minTempbyProv <- minTempbyProv %>%
-  mutate("2020-01" = rowMeans(.[2:32])) %>%
-  mutate("2020-02" = rowMeans(.[33:61])) %>%
-  mutate("2020-03" = rowMeans(.[62:92])) %>%
-  mutate("2020-04" = rowMeans(.[93:121])) %>%
-  mutate("2020-05" = rowMeans(.[122:152])) %>%
-  mutate("2020-06" = rowMeans(.[153:182])) %>%
-  mutate("2020-07" = rowMeans(.[183:213])) %>%
-  mutate("2020-08" = rowMeans(.[214:244]))
-
-# Select just the state and the mean maximum temperature of states in a month.
-minTempbyProv <- minTempbyProv %>% select(province, starts_with("2020"))
+# Select just the state and the mean maximum daily temperature of states.
+minTempbyProv <- minTempbyProv %>% select(province, starts_with("X"))
 
 # Define function to transpose a state's temperature per month data.
 transposeMinState <- function(stateName){
   df <- minTempbyProv %>% filter(province == as.character(stateName)) %>%
-    select(starts_with("2020")) %>%
+    select(starts_with("X")) %>%
     t() %>%
     as.data.frame()
-  df <- df %>% mutate(month = rownames(df)) %>% mutate(province = stateName) %>% rename(Min = V1)
+  df <- df %>% 
+    mutate(unformatedDate = substr(rownames(df), start=2, stop=8)) %>% 
+    mutate(province = stateName) %>% rename(Min = V1) %>% 
+    mutate(date = as.Date.character(unformatedDate, format="%m.%d.%y")) %>%
+    select(!unformatedDate)
   return(df)
 }
 
@@ -169,30 +158,23 @@ Process wind data:
 #Filter out invalid values:
 windDataFiltered <- windData %>% filter_at(vars(starts_with("X")), all_vars(. > 0))
 
-#Calculate the mean minimum temperature of a state in a day
+#Calculate the mean minimum daily wind speed of a state.
 windByProv <- aggregate(windDataFiltered[12:269] , by=list(province=windDataFiltered$Province_State), FUN=mean)
 
-#Calculate the mean minimum temperature of a state in a month
-windByProv <- windByProv %>%
-  mutate("2020-01" = rowMeans(.[2:32])) %>%
-  mutate("2020-02" = rowMeans(.[33:61])) %>%
-  mutate("2020-03" = rowMeans(.[62:92])) %>%
-  mutate("2020-04" = rowMeans(.[93:121])) %>%
-  mutate("2020-05" = rowMeans(.[122:152])) %>%
-  mutate("2020-06" = rowMeans(.[153:182])) %>%
-  mutate("2020-07" = rowMeans(.[183:213])) %>%
-  mutate("2020-08" = rowMeans(.[214:244]))
-
-# Select just the state and the mean maximum temperature of states in a month.
-windByProv <- windByProv %>% select(province, starts_with("2020"))
+# Select just the state and the mean maximum daily wind speed of states.
+windByProv <- windByProv %>% select(province, starts_with("X"))
 
 # Define function to transpose a state's temperature per month data.
 transposeWinState <- function(stateName){
   df <- windByProv %>% filter(province == as.character(stateName)) %>%
-    select(starts_with("2020")) %>%
+    select(starts_with("X")) %>%
     t() %>%
     as.data.frame()
-  df <- df %>% mutate(month = rownames(df)) %>% mutate(province = stateName) %>% rename(Wind = V1)
+  df <- df %>% 
+    mutate(unformatedDate = substr(rownames(df), start=2, stop=8)) %>% 
+    mutate(province = stateName) %>% rename(Wind = V1) %>% 
+    mutate(date = as.Date.character(unformatedDate, format="%m.%d.%y")) %>%
+    select(!unformatedDate)
   return(df)
 }
 
@@ -219,8 +201,8 @@ Merge temperature and wind data:
 
 ```{r warning=FALSE, message=FALSE}
 # Merge the max and min temperature into one data set.
-TempByProv <- merge(maxTempbyProvTransposed, minTempbyProvTransposed, by = c("province", "month"))
-ClimateByProv <- merge(TempByProv, windByProvTransposed, by = c("province", "month"))
+TempByProv <- merge(maxTempbyProvTransposed, minTempbyProvTransposed, by = c("province", "date"))
+ClimateByProv <- merge(TempByProv, windByProvTransposed, by = c("province", "date"))
 # Display the first 10 values of the merged temperature data set.
 options(digits = 3)
 kable(head(ClimateByProv, n = 10))
@@ -231,35 +213,15 @@ kable(head(ClimateByProv, n = 10))
 Merge temperature data with Covid19 data:
 ```{r warning=FALSE, message=FALSE}
 ClimateByState <- merge(ClimateByProv, stateData, by=c("province"))
-Covid19Climate <- merge(ClimateByState, Covid19MonthlyData, by=c("state", "month"))
+Covid19Climate <- merge(ClimateByState, Covid19SumData, by=c("state", "date"))
 
 # Display the first 10 values of the merged temperature data set.
 options(digits = 3)
 kable(head(Covid19Climate, n = 10))
 ```
 
-Written Analysis
-A knitted and polished rMarkdown file and HTML output reporting the results of your final data analysis project. Roughly, 3-5 written pages maximum. Consider it a "final takeaway" of all the skills you’ve learned in class over the semester. Below is a rough structure of your final written report. Here you should use code folding so this section mirrors a ready to deliver report with clear section headers and interpretations of any statistical or graphical output (like several of our previous projects), but it will also be easy for your instructor to see the code, if needed. Include the following sections in your report:
-
-## Introduction:
-
-_Provide a two paragraph introduction, professionally written, that gives an overview of the essentials someone needs to know to make sense of the data you show. You must cite and link to your data set somewhere in the introduction (a footnote is OK). Revising and building on your introduction from the previous assignments is allowed and encouraged, but using the exact same introduction is discouraged._
-
-Corona virus disease 2019 (COVID-19), initially identified in December 2019 in Wuhan, China, has now become a global pandemic. It is a very infectious virus that spreads between humans, mainly via physical contact with bodily fluids[1]. Scientific research has shown that climate temperature plays a role in the spreading of the virus[2]. This research aim to redo the experiment using different data and techniques to see if the claims made in the researches are true.
-
-Research will try to answer the question: Does climate temperature affects the spread of Covid-19? And how? The dependent variable, which will be the variable used to determine the "spread of Covid-19", will be the daily confirmed cases of a country. By looking at a single country, the data will be more uniform as different country has different population size and different seriousness when it comes to response to the pandemic, which consequently affect the number of confirmed cases. This variable will be extracted from the Covid-19 data by Out world in Data[4]. The independent variable that might effect the spread of Covid-19 that the research is going to look at is minimum and maximum temperature of different regions in a country (i.e different states in the US). Temperature data set of the US states since January to October[5] will be used to extract the necessary data to perform analysis. The topic question will be an exploratory type of question, as it will be looking for unknown patterns within the data.
-
-## Ethical Considerations:
-
-_Provide one paragraph discussing the stakeholders in your data analysis and your ethical concerns or responsibilities using the data and in your analysis. Everyone has ethical considerations, no matter what the data set or subject matter._
-
-Since the researching the research is using data from the internet for analysis, the data itself are public for every one to look at and process. However, the research is conducted by an individual (me), however carefully conducted, there will be flaws and mistakes in logic and assumptions. There are potential for harm in this analysis. As Covid19 is a very unpredictable infectious disease, these analysis should only be part of the consideration of your decision to act upon the disease.
 
 ## Data Explanation and Exploration:
-
-_Provide some details describing the data you are working with. What are the observations? The key variables you will be looking at? Are there any particular challenges in the data you will need to work through or be aware of during analysis?_
-
-_Provide two polished visuals that describes the data in a way relevant to your question (descriptive, not related to your statistical model specifically--not a scatter plot). Write text that describes the data and what the visuals tell you about your data or decisions you will need to make for the analysis._
 
 As stated above, the research will be looking at the spread of Covid-19, which is determined by the number of confirmed positive test cases in the states. The variables that might affect the spread are the temperature of the states.
 
@@ -272,15 +234,15 @@ The challenge is that these two data set are formatted differently, so data wran
 Bar plot showing the change in __number of positive test cases.__ in the entire US in 2020.
 ```{r}
 #Aggregate monthly sum test of entire US:
-Covid19SumPos <- aggregate(Covid19Climate$positiveCaseViral, by=list(month = Covid19Climate$month), FUN=sum) %>% rename(positiveCaseViral = x)
+Covid19SumPos <- aggregate(Covid19Climate$positiveCaseViral, by=list(date = Covid19Climate$date), FUN=sum) %>% rename(positiveCaseViral = x)
 
 #Plot
-ggplot(Covid19SumPos, aes(month, positiveCaseViral)) + 
-  geom_bar(stat="identity", fill="steelblue") +
+ggplot(Covid19SumPos, aes(date, positiveCaseViral)) + 
+  geom_line() +
   labs(
     title="Covid19 positive test cases",
     caption='The change in Covid19 positive test cases in the entire US in 2020',
-    x="Month",
+    x="Time",
     y="Positive test cases") + 
   theme_minimal() + 
   theme(plot.title = element_text(hjust = 0.5))
@@ -291,21 +253,34 @@ Frequency polygon showing distribution of maximum and minimum temperature across
 ggplot(Covid19Climate) + 
   geom_freqpoly(bins = 40, aes(Max), color="red", size=3) +
   geom_freqpoly(bins = 40, aes(Min), color="steelblue", size=3) +
-  labs(title="Maximum (red) and Minimum (blue) temperature across the states", 
+  labs(title="Maximum (red) and Minimum (blue) temperature across the states",
+    caption="Frequency polygon representing distribution of maximum (red) and minimum (blue) temperature.",
     x="degrees Celcius",
     y="Count") + 
   theme_minimal() + 
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
-Boxplot showing distribution of maximum and minimum temperature across the months:
+Line plot showing changes in maximum and minimum temperature across the months:
 ```{r}
-ggplot(Covid19Climate) + 
-  geom_boxplot(aes(month, Max), outlier.colour = "gray", fill="red") +
-  geom_boxplot(aes(month, Min), outlier.colour = "gray", fill="steelblue") +
+#Calculate daily mean maximum temperature across all state.
+Covid19MaxTemp <- aggregate(Covid19Climate$Max, by=list(date=Covid19Climate$date), FUN=mean) %>%
+  rename(Max = x)
+
+#Calculate daily mean minimum temperature across all state.
+Covid19MinTemp <- aggregate(Covid19Climate$Min, by=list(date=Covid19Climate$date), FUN=mean) %>%
+  rename(Min = x)
+
+#Merge the two to create a data frame of daily mean minimum, maximum temperaturea across all states.
+Covid19DailyTemp <- merge(Covid19MaxTemp, Covid19MinTemp, by="date")
+
+ggplot(Covid19DailyTemp) + 
+  geom_line(aes(date, Max), color="red") +
+  geom_line(aes(date, Min), color="blue") +
   labs(
-    title="Distribution of max and min temperature across the months", 
-    x="Month",
+    title="Change of max and min temperature", 
+    caption="Change in daily maximum (red) and minimum (blue) temperature of the states.",
+    x="Date",
     y="degrees Celcius") + 
   theme_minimal() + 
   theme(plot.title = element_text(hjust = 0.5))
@@ -318,9 +293,14 @@ ggpairs(Covid19Climate, columns=c("Max", "Min", "Wind"))
 
 ## Statistical Analysis and Interpretation:
 
-_Provide at least two distinct statistical models (for example; multivariate regression and/or t-test) that you interpret correctly and fully in the text. Report your results in a polished table (kable)._
+Test for correlation between daily wind speed, minimum, maximum temperature and the number of positive test case.
+```{r}
+cor.test(Covid19Climate$Min, Covid19Climate$positiveCaseViral, method = "pearson")
+cor.test(Covid19Climate$Max, Covid19Climate$positiveCaseViral, method = "pearson")
+cor.test(Covid19Climate$Wind, Covid19Climate$positiveCaseViral, method = "pearson")
+```
 
-_Provide at least three polished visuals that specifically support and validate the model(s) you have developed (e.g., residual and regression line/scatter, histogram showing normality of data or residuals, etc.), or help to communicate your main result. Visuals should have captions and be referred to clearly in your text, and they should not all be the same (e.g., not three scatter plots). Text should fully explain what you show and your findings, to someone who is unfamiliar with your data, code, and models, in terms of the data and in plain language._
+Conducting correlation test for all three variables we have the following values: t is the t-test statistic value, with maximum, minimum temperature and wind speed valued at t = 20, 16, -7 respectively. df is the degrees of freedom, uniformly valued at df= 3067, p-value is the significance level of the t-test, which is infinitesimally small.Confidence interval of the correlation coefficient at 95% value at respectively [0.315 0.377] for maximum temperature, [0.251, 0.316] for minimum temperature, [-0.1584 -0.0887] for wind speed. Sample estimates are the estimated correlation coefficient, which valued at 0.346 for maximum temperature, 0.284 for minimum temperature, -0.124 for wind speed.
 
 ```{r warning=FALSE, message=FALSE}
 train_test <- split(Covid19Climate, sample(0:107, size=2, replace=F))
@@ -358,7 +338,7 @@ test <- test %>%
   mutate(predictionMaxDiff =  abs(positiveCaseViral - predict(maxTempModel, test)))
 ```
 
-Histogram representing difference between predicted number of positive cases and actual positive cases:
+Histograms representing difference between predicted number of positive cases and actual positive cases:
 ```{r warning=FALSE, message=FALSE}
 ggplot(test, aes(test$predictionMaxDiff)) + 
   geom_histogram(fill="steelblue") +
@@ -392,13 +372,37 @@ ggplot(test, aes(test$predictionWindDiff)) +
 
 ## Conclusions:
 
-_Provide one or two paragraphs concluding about the data: what does it tell us, what are the limitations to this data/model, and what is one future direction you could envision for future data analysts or data collectors?_
+The data suggest that there exist a correlation between each independent variable of maximum temperature, minimum temperature, and wind speed to the dependent variable. However, there exist limitations in this data and the regression model. Because the awareness of Covid-19 not starts at around March, as shown the in sudden increase of positive test case graph, the data gathering process does not fully start until the beginning of April. This leads to incomplete data in between the months of January and March. The climate data set is gathered by many stations in a single state. The processing step takes the mean value of all the stations observation to represent the state's climate observations, which may or may not truely represent the state's climate situation. This may effect the regression analysis's accuracy because the data itself may or may not truely represent the situation. Another limitation in the regression and choice of exploratory variable is that these exploratory variables have high correlation with each other. In the future, the research will be looking for different exploratory or independent variable that represents the climate and how it effects the spread of Covid-19.
 
-_Find at least one reference that is relevant to or supports your insights, and cite it in this section. You may cite a reference by linking directly to it in your Rmd and/or citing it using your style of choice. Either way, the full citation should also appear in a "Works Cited" page below the conclusions section._
+Reference that is relevant and supports my insights[8]: 
 
-This experiment was done with 
+Xie, Jingui, and Yongjian Zhu. “Association between Ambient Temperature and COVID-19 Infection in 122 Cities from China.” Science of The Total Environment, Elsevier, 30 Mar. 2020, www.sciencedirect.com/science/article/pii/S0048969720317149
 
+## Works Cited:
 
+>1. “How Coronavirus Spreads.” Centers for Disease Control and Prevention, Centers for Disease Control and Prevention, www.cdc.gov/coronavirus/2019-ncov/prevent-getting-sick/how-covid-spreads.html
+This source is published by the CDC as a way to inform the public with basic information about COVID 19. Specifically in this source, it gives facts about how COVID-19 spreads as well as stating some researches claiming various theories about factors that affect the spread of COVID-19. The claims made in this source serves as the foundation of this research.
 
+>2. Pirouz, Behzad, et al. “Relationship between Average Daily Temperature and Average Cumulative Daily Rate of Confirmed Cases of COVID-19.” MedRxiv, Cold Spring Harbor Laboratory Press, 1 Jan. 2020, www.medrxiv.org/content/10.1101/2020.04.10.20059337v3
 
+>Prata, David N., et al. “Temperature Significantly Changes COVID-19 Transmission in (Sub)Tropical Cities of Brazil.” Science of The Total Environment, Elsevier, 25 Apr. 2020, www.sciencedirect.com/science/article/pii/S004896972032379
+Xie, Jingui, and Yongjian Zhu. “Association between Ambient Temperature and COVID-19 Infection in 122 Cities from China.” Science of The Total Environment, Elsevier, 30 Mar. 2020, www.sciencedirect.com/science/article/pii/S0048969720317149
+These sources are studies with a closely resembling research question with my research, however, it used a different dependent variable that corresponds to the actual spread of COVID-19. The dependent variable these groups used was confirmed cases and is conducted in China and Brazil and all the countries’ cities. These sources is used as a comparison on how the two different dependent variables might correspond to the actual spread of COVID-19.
+
+>3. Roser, Max, et al. “Coronavirus Pandemic (COVID-19) - Statistics and Research.” Our World in Data, 4 Mar. 2020, www.ourworldindata.org/coronavirus
+This source is actually a data set but it explains how each variable affects the spread of COVID-19. Those explanations include why it is more effective and precise to measure the spread of COVID-19 in terms of tests per confirmed case.
+
+>4. “Our Data.” The COVID Tracking Project, www.covidtracking.com/data
+This source is the data set used to obtain all the COVID-19 data, including the dependent variable tests per confirmed case.
+
+>5. Eeemonts. “Weather/Climate Data for JHU's COVID19 Sites.” Kaggle, 24 Sept. 2020, www.kaggle.com/eeemonts/weatherclimate-data-covid19
+This source is the data set used to obtain the independent climate variables.
+
+>6. “Data Definitions.” The COVID Tracking Project, www.covidtracking.com/about-data/data-definitions
+This source is the metadata for the climate variable data set.
+
+>7. Grossman, Adam. Dark Sky Blog, 1 Aug. 2020, www.blog.darksky.net 
+This source is the document about Dark Sky, the company responsible for collecting the weather data for the climate data set.
+
+>8. Xie, Jingui, and Yongjian Zhu. “Association between Ambient Temperature and COVID-19 Infection in 122 Cities from China.” Science of The Total Environment, Elsevier, 30 Mar. 2020, www.sciencedirect.com/science/article/pii/S0048969720317149
 
