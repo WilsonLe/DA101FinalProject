@@ -322,26 +322,6 @@ _Provide at least two distinct statistical models (for example; multivariate reg
 
 _Provide at least three polished visuals that specifically support and validate the model(s) you have developed (e.g., residual and regression line/scatter, histogram showing normality of data or residuals, etc.), or help to communicate your main result. Visuals should have captions and be referred to clearly in your text, and they should not all be the same (e.g., not three scatter plots). Text should fully explain what you show and your findings, to someone who is unfamiliar with your data, code, and models, in terms of the data and in plain language._
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ```{r warning=FALSE, message=FALSE}
 train_test <- split(Covid19Climate, sample(0:107, size=2, replace=F))
 test <- as.data.frame(train_test[2])
@@ -371,9 +351,54 @@ R-squared is a metric used to evaluate the fit precision of the model. The maxim
 The F-value in these models are the results of tests where the null hypothesis is "all of the regression coefficients are equal to zero". Since the p-value of all 3 models are much less than the alpha level, the null hypothesis can be rejected. All the models have their F-statistic relatively larger than 1, given the size of the data, insinuating that there may be correlations between the independent variables and the number of positive test cases in the US.
 
 
+```{r warning=FALSE, message=FALSE}
+test <- test %>%
+  mutate(predictionWindDiff =  abs(positiveCaseViral - predict(WindModel, test))) %>%
+  mutate(predictionMinDiff =  abs(positiveCaseViral - predict(minTempModel, test))) %>%
+  mutate(predictionMaxDiff =  abs(positiveCaseViral - predict(maxTempModel, test)))
+```
+
+Histogram representing difference between predicted number of positive cases and actual positive cases:
+```{r warning=FALSE, message=FALSE}
+ggplot(test, aes(test$predictionMaxDiff)) + 
+  geom_histogram(fill="steelblue") +
+  labs(
+    title="Distribution of maximum temperature prediction difference",
+    caption="Histogram represents the distribution of the maximum temperature model's prediction difference",
+    x="Confirmed cases difference") +
+  theme_minimal() + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(test, aes(test$predictionMinDiff)) + 
+  geom_histogram(fill="steelblue") +
+  labs(
+    title="Distribution of minimum temperature prediction difference",
+    caption="Histogram represents the distribution of the minimum temperature model's prediction difference",
+    x="Confirmed cases difference") +
+  theme_minimal() + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(test, aes(test$predictionWindDiff)) + 
+  geom_histogram(fill="steelblue") +
+  labs(
+    title="Distribution of wind speed prediction difference",
+    caption="Histogram represents the distribution of the wind speed model's prediction difference",
+    x="Confirmed cases difference") +
+  theme_minimal() + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
 
 ## Conclusions:
 
-Provide one or two paragraphs concluding about the data: what does it tell us, what are the limitations to this data/model, and what is one future direction you could envision for future data analysts or data collectors?
+_Provide one or two paragraphs concluding about the data: what does it tell us, what are the limitations to this data/model, and what is one future direction you could envision for future data analysts or data collectors?_
 
-Find at least one reference that is relevant to or supports your insights, and cite it in this section. You may cite a reference by linking directly to it in your Rmd and/or citing it using your style of choice. Either way, the full citation should also appear in a "Works Cited" page below the conclusions section.
+_Find at least one reference that is relevant to or supports your insights, and cite it in this section. You may cite a reference by linking directly to it in your Rmd and/or citing it using your style of choice. Either way, the full citation should also appear in a "Works Cited" page below the conclusions section._
+
+This experiment was done with 
+
+
+
+
+
